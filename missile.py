@@ -23,6 +23,8 @@ class Missile():
         self.dt = 1.0/fps
         self.alive = True
         self.hit = False
+        self.p_last = []
+        self.m_last = []
 
 
     def pure_guidance(self, plane):
@@ -32,12 +34,16 @@ class Missile():
         *** + omega is clockwise    - is ct clockwise
         """
         x, y, vx, vy = plane.missile_tracking()
-        vec_target = [x-self.x, y-self.y]
-        vec_missile = [self.v[0], self.v[1]]
+        vec_target = [x-self.x, y-self.y]           # displacement vector
+        vec_missile = [self.v[0], self.v[1]]        # velocity vector
         dot_prod = vec_target[0] * vec_missile[0] + vec_target[1] * vec_missile[1]
         mag_prod = sqrt(vec_target[0]**2 + vec_target[1]**2) * sqrt(vec_missile[0]**2 + vec_missile[1]**2)
         cross_prod_k = vec_target[0] * vec_missile[1] - vec_missile[0] * vec_target[1]
-        omega = acos(dot_prod/mag_prod)
+        try:
+            omega = acos(dot_prod/mag_prod)
+        except ValueError:
+            # due to floating point math, dot product can be > magnitude when they're perfectly aligned...
+            omega = 0
         # this gets how much omega can be done and how much v will be bled
         turn_command, decel = self.calc_angle_drag(omega)
         # fixing omega using cross product..
@@ -47,6 +53,41 @@ class Missile():
         self.turn(turn_command, decel)
         self.x += self.v[0] * self.dt
         self.y += self.v[1] * self.dt
+
+    
+    def proportional_guidance(self, plane):
+        ''' the real beast of an algorithm
+        normal accel = N * LOS rate * closing V
+        accel is proportional to LOS rate and closing velocity
+        N = navigational gain (3-5 according to wiki)
+        '''
+        if len(self.p_last) == 0 or len(self.m_last) == 0:
+            # upon initialization
+            self.p_last = [plane.x, plane.y]
+            self.m_last = [self.x, self.y]
+            self.pure_guidance(plane)
+        else:
+            x, y, vx, vy = plane.missile_tracking()
+            # both vectors are of velocity
+            V0 = [self.p_last[0]-self.m_last[0], self.p_last[1], self.m_last[1]]
+            V1 = [x - self.x, y - self.y]
+            self.p_last[0] = x
+            self.p_last[1] = y
+            self.m_last[0] = self.x
+            self.m_last[1] = self.y
+            dot_prod = V0[0] * V1[0] + V0[1] * V1[1]
+            mag_prod = sqrt(V0[0]**2 + V0[1]**2) * sqrt(V1[0]**2 + V1[1]**2)
+            cross_prod_k = V0[0] * V1[1] - V1[0] * V0[1]
+            try:
+                omega = acos(dot_prod/mag_prod)
+            except ValueError:
+                # due to floating point math, dot product can be > magnitude when they're perfectly aligned...
+                omega = 0
+             # fixing omega using cross product..
+            if cross_prod_k > 0:
+                omega *= -1
+            rate_LOS = omega * self.dt
+            print(rate_LOS)
     
 
     def calc_angle_drag(self, desired_omega):
@@ -90,6 +131,7 @@ class Missile():
         if self.guidance_mode == 1:
             # -> pure guidance
             self.pure_guidance(plane)
+            # self.proportional_guidance(plane)
         elif self.guidance_mode == 2:
             # TODO
             pass

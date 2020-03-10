@@ -26,6 +26,11 @@ class Game:
         self.plane_img = pygame.transform.scale(self.plane_img, (40, 40))
         self.missile_img = pygame.image.load('missile.png')
         self.missile_img = pygame.transform.scale(self.missile_img, (15, 30))
+        self.missile_img1 = pygame.image.load('missile1.png')
+        self.missile_img1 = pygame.transform.scale(self.missile_img1, (20, 30))
+        self.collision_img = pygame.image.load('collision.jpeg')
+        self.collision_img = pygame.transform.scale(self.collision_img, (40, 40))
+        self.collisions = []
         self.score = 0
 
 
@@ -74,7 +79,7 @@ class Game:
         '''
         c = choice([0, 1, 2, 3])
         if c == 0:
-            # spawn above 
+            # spawn above
             self.missiles.append(missile.Missile(randint(-100, 900), 0, 0,\
                  v_missile, omega_missile, 0, 0, self.fps, 1))
         elif c == 1:
@@ -96,18 +101,20 @@ class Game:
         takes kb inputs and controls the plane/quit the game
         """
         if keys[K_LEFT] and not keys[K_RIGHT]:
-            "counter clockwise"
+            # counter clockwise
             self.plane.move(-1)
         elif keys[K_RIGHT] and not keys[K_LEFT]:
-            'clockwise'
+            # clockwise
             self.plane.move(1)
         elif not keys[K_RIGHT] and not keys [K_LEFT]:
+            self.plane.move()
+        else:
             self.plane.move()
         if keys[K_ESCAPE]:
             self.quit()
             self.running = False
-    
-    
+
+
     def rot_center(self, image, angle):
         """rotate an image while keeping its center and size
         ** for square only
@@ -144,7 +151,7 @@ class Game:
                 y -= 15
                 rotated = pygame.transform.rotate(self.missile_img, m.get_angle())
                 self.display.blit(rotated, (x, y))
-    
+
 
     def is_alive(self, radius):
         ''' detects if plane and missiles are alive
@@ -162,7 +169,7 @@ class Game:
                 m.alive = False
                 self.missiles.remove(m)
                 self.score += 1
-                
+
 
     def missiles_collision(self, radius):
         ''' detects missile collision
@@ -174,7 +181,19 @@ class Game:
                     cprint("KABOOOM!!!", 'red', attrs=['bold'])
                     self.missiles.remove(m1)
                     self.missiles.remove(m2)
+                    self.collisions.append([time(), int(round((m1.x+m2.x)/2)), int(round((m1.y+m2.y)/2))])
                     self.score += 2
+
+
+    def draw_explosion(self):
+        ''' draws display the explosion when 2 missiles collide
+        '''
+        for c in self.collisions:
+            if (time() - c[0]) < 0.5:
+                # self.display.blit(self.collision_img, (c[1], c[2])
+                pygame.draw.circle(self.display, (255,0,0), (c[1], c[2]), 8)
+            else:
+                self.collisions.remove(c)
 
 
     def mainloop(self, omega_missile, v_missile):
@@ -195,6 +214,7 @@ class Game:
         self.centering()
         self.draw_plane()
         self.draw_missiles()
+        self.draw_explosion()
         self.is_alive(15)
         pygame.display.flip()
         self.display.fill(self.background_color)
@@ -202,7 +222,7 @@ class Game:
         sleep(1/self.fps)
 
 
-    def run(self, omega_plane=540, v_plane=240, omega_missile=220, v_missile=280):
+    def run(self, omega_plane=540, v_plane=240, omega_missile=150, v_missile=500):
         """ () -> void
         runs the game routine
         ORDER OR OPERATION:
@@ -229,12 +249,12 @@ class Game:
         except KeyboardInterrupt:
             self.quit()
 
-    
+
     def restart(self):
         ''' restart loop
         '''
         keys = pygame.key.get_pressed()
-        events = pygame.event.get()    
+        events = pygame.event.get()
         pygame.display.set_caption("Destroyed by the AIM9X!  Score: {}  <ENTER> to restart, <ESC> to quit".format(self.score))
         if keys[K_ESCAPE]:
             self.quit()
